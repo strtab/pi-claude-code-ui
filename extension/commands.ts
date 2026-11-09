@@ -13,6 +13,7 @@ import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { setExtraDetail } from "./tools/builtins.js";
 import { bustGroupingSettingsCache, repaintGroupedRows } from "./tools/grouping.js";
+import { runSpinnerCommand } from "./spinner-config.js";
 
 const SETTINGS_KEY_GROUP = "groupToolCalls";
 const SETTINGS_KEY_EXTRA_DETAIL = "ccToolsExtraDetail";
@@ -216,8 +217,6 @@ export function registerCommands(pi: ExtensionAPI): void {
 			writeSettingsKey(SETTINGS_KEY_CC_THEME, choice);
 		},
 	});
-
-  import { runSpinnerCommand } from "./spinner-config.js";
 
   pi.registerCommand("cc-spinner", {
     description: "Show or change the spinner style (/cc-spinner status for options)",
