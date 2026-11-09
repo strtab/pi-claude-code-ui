@@ -217,14 +217,15 @@ export function registerCommands(pi: ExtensionAPI): void {
 		},
 	});
 
-	// /cc-spinner — show spinner configuration.
-	pi.registerCommand("cc-spinner", {
-		description: "Show the CC spinner configuration",
-		async handler(_args, ctx) {
-			if (!ctx.hasUI) return;
-			ctx.ui.notify("Spinner: CC frames (· ✢ ✳ ✶ ✻ ✽), 120ms, ~190 fun verbs", "info");
-		},
-	});
+  import { runSpinnerCommand } from "./spinner-config.js";
+
+  pi.registerCommand("cc-spinner", {
+    description: "Show or change the spinner style (/cc-spinner status for options)",
+    async handler(args, ctx) {
+      const { message, error } = runSpinnerCommand(args);
+      if (ctx.hasUI) ctx.ui.notify(message, error ? "error" : "info");
+    },
+  });
 
 	// CC 没有 verbose 的键盘快捷键 —— claude-code-main 里 verbose 只能在 /config
 	// 面板切换（ctrl+shift+o 是 app:toggleTeammatePreview，与 verbose 无关）。

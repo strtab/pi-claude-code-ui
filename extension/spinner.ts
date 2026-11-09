@@ -20,18 +20,14 @@
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { fg as paletteFg, resolvePalette } from "./palette.js";
 
-// CC Spinner/utils.ts getDefaultCharacters(): Ghostty renders ✽ slightly offset,
-// so the last frame is * there.
-function defaultCharacters(): string[] {
-	if (process.env.TERM === "xterm-ghostty") return ["·", "✢", "✳", "✶", "✻", "*"];
-	return ["·", "✢", "✳", "✶", "✻", "✽"];
+import { getSpinnerConfig, hexPainter, reloadSpinnerConfig } from "./spinner-config.js";
+
+function spinnerFrames(): string[] {
+	const cfg = getSpinnerConfig();
+	const base = cfg.frames?.length ? cfg.frames : ["·", "✢", "✻"];
+	return cfg.pingPong === false ? base : [...base, ...[...base].reverse()];
 }
 
-const FRAMES = defaultCharacters();
-// Forward then reverse — CC's SpinnerAnimationRow plays the loop ping-pong.
-const SPINNER = [...FRAMES, ...[...FRAMES].reverse()];
-// CC SpinnerAnimationRow.tsx:133 — frame = Math.floor(time / 120).
-const FRAME_MS = 120;
 // CC useAnimationFrame(50): the whole row is repainted at 20fps.
 const TICK_MS = 50;
 // CC SpinnerAnimationRow.tsx:135 — non-requesting glimmer cadence.
@@ -74,7 +70,10 @@ const VERBS = [
 ] as const;
 
 function sampleVerb(): string {
-	return VERBS[Math.floor(Math.random() * VERBS.length)] ?? "Working";
+	const cfg = getSpinnerConfig();
+	if (cfg.verb) return cfg.verb;
+	const pool: readonly string[] = cfg.verbs?.length ? cfg.verbs : VERBS;
+	return pool[Math.floor(Math.random() * pool.length)] ?? "Working";
 }
 
 /** The active turn's spinner verb (for other modules restoring the working message). */
@@ -218,8 +217,10 @@ export function thinkingWording(blockElapsedMs: number): string {
 export function buildSpinnerLine(state: SpinnerFrameState, paint: SpinnerPaint): string {
 	const message = `${state.verb}…`;
 	const messageWidth = plainWidth(message);
-	const frame = Math.floor(state.timeMs / FRAME_MS) % SPINNER.length;
-	const glyph = paint.accent(SPINNER[frame] ?? "✻");
+  const cfg = getSpinnerConfig();
+  const spinner = spinnerFrames();
+  const frame = Math.floor(state.timeMs / (cfg.frameMs ?? 300)) % spinner.length;
+  const glyph = paint.accent(spinner[frame] ?? "✻");
 
 	// Glimmer sweep — CC SpinnerAnimationRow.tsx:139-147 (non-requesting branch):
 	// glimmerIndex = messageWidth + 10 - (cyclePosition % cycleLength), sweeping
@@ -227,7 +228,7 @@ export function buildSpinnerLine(state: SpinnerFrameState, paint: SpinnerPaint):
 	const cycleLength = messageWidth + 20;
 	const cyclePosition = Math.floor(state.timeMs / GLIMMER_MS);
 	const glimmerIndex = messageWidth + 10 - (cyclePosition % cycleLength);
-	const verbSpan = glimmerMessage(message, glimmerIndex, paint);
+  const verbSpan = cfg.glimmer === false ? paint.accent(message) : glimmerMessage(message, glimmerIndex, paint);
 
 	// --- Byline (CC SpinnerAnimationRow.tsx:163-215) -----------------------
 	const status = state.thinkingStatus ?? null;
@@ -240,7 +241,8 @@ export function buildSpinnerLine(state: SpinnerFrameState, paint: SpinnerPaint):
 				: null;
 
 	const timerText = formatElapsed(state.timeMs);
-	const tokensText = state.tokens && state.tokens > 0 ? `↓ ${formatTokenCount(state.tokens)} tokens` : null;
+  const tokensText =
+    cfg.showTokens !== false && state.tokens && state.tokens > 0 ? `↓ ${formatTokenCount(state.tokens)} tokens` : null;
 
 	// Progressive width gating (CC:176-196). `2 + messageWidth` = glyph+space+verb;
 	// CC reserves 5 more for parens/margin. SEP is " · ".
@@ -254,7 +256,7 @@ export function buildSpinnerLine(state: SpinnerFrameState, paint: SpinnerPaint):
 		showThinking = true;
 	}
 	const usedAfterThinking = showThinking ? thinkingWidth + SEP : 0;
-	const showTimer = availableSpace > usedAfterThinking + plainWidth(timerText);
+  const showTimer = cfg.showTimer !== false && availableSpace > usedAfterThinking + plainWidth(timerText);
 	const usedAfterTimer = usedAfterThinking + (showTimer ? plainWidth(timerText) + SEP : 0);
 	const showTokens = tokensText !== null && availableSpace > usedAfterTimer + plainWidth(tokensText);
 
@@ -343,22 +345,14 @@ export function registerSpinner(pi: ExtensionAPI): void {
 	}
 
 	function paintFor(theme: Theme): SpinnerPaint {
-		// CC messageColor 'claude' / shimmerColor 'claudeShimmer' are BRAND
-		// colors, not the UI accent: the theme's `accent` maps to CC's
-		// suggestion blue (menus, selectors), so the spinner resolves the CC
-		// palette directly (memoized per theme name).
-		const pal = resolvePalette(theme.name, (token) => {
-			try {
-				return theme.fg(token as never, "x");
-			} catch {
-				return undefined;
-			}
-		});
-		return {
-			accent: (s) => paletteFg(pal.cc.claude, s),
-			shimmer: (s) => paletteFg(pal.cc.claudeShimmer, s),
-			dim: (s) => theme.fg("dim", s),
-		};
+    const cfg = getSpinnerConfig();
+    const accent = hexPainter(cfg.accent);
+    const shimmer = hexPainter(cfg.shimmer);
+    return {
+      accent: accent ?? ((s) => paletteFg(pal.cc.claude, s)),
+      shimmer: shimmer ?? accent ?? ((s) => paletteFg(pal.cc.claudeShimmer, s)),
+      dim: (s) => theme.fg("dim", s),
+    };
 	}
 
 	type UiCtx = { hasUI: boolean; ui: { theme: Theme; setWorkingMessage(m?: string): void } };
@@ -420,6 +414,7 @@ export function registerSpinner(pi: ExtensionAPI): void {
 	// §3-2), matching CC's mount-time useState(() => sample(...)) (Spinner.tsx:204).
 	pi.on("agent_start", async (_event, ctx) => {
 		verb = sampleVerb();
+    reloadSpinnerConfig();
 		animStartMs = Date.now();
 		settledTokens = 0;
 		streamTokens = 0;
