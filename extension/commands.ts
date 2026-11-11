@@ -1,7 +1,8 @@
 /**
  * Commands: /cc-tools, /cc-theme, /cc-spinner (same names as the old extension
- * to keep migration cost zero). Extra detail 对齐 CC：无键盘快捷键（CC 只在
- * /config 面板切 verbose），只能 /cc-tools detail 切换，开启时状态栏显示 detail。
+ * to keep migration cost zero). Extra detail aligned with CC: no keyboard shortcut
+ * (CC only toggles verbose in the /config panel), can only toggle via /cc-tools detail,
+ * shows detail indicator in status bar when enabled.
  *
  * The group and extra-detail toggles persist to ~/.pi/settings.json (old ext
  * writeSettingsKey pattern) so they survive restarts; grouping.ts reads
@@ -81,12 +82,14 @@ export function isExtraDetail(): boolean {
 }
 
 export function registerCommands(pi: ExtensionAPI): void {
-	// AUDIT §4 / §5:71 (P2 ×11): extraDetail 是持久化的（ccToolsExtraDetail），但
-	// builtins.ts 的模块级 extraDetail 只默认 false、且仅由 setExtraDetail() 改写。
-	// 启动时没人把持久化值回灌给 builtins → 状态栏读 commands.ts 的 extraDetail 说
-	// "on"，实际预览仍按 8 行（off），而第一次 Ctrl+Shift+O 做 setDetail(!extraDetail)
-	// = setDetail(false)，把两边都归到 off，看起来“第一次快捷键空按/反而关掉”。
-	// 在这里一次性同步：让 builtins 的开关与持久化/显示状态一致。
+	// AUDIT §4 / §5:71 (P2 ×11): extraDetail is persisted (ccToolsExtraDetail), but
+	// the module-level extraDetail in builtins.ts defaults to false and is only
+	// modified by setExtraDetail(). Nothing restores the persisted value to builtins
+	// at startup → status bar reads commands.ts extraDetail as "on", but actual
+	// preview still uses 8 lines (off), and the first Ctrl+Shift+O does
+	// setDetail(!extraDetail) = setDetail(false), bringing both sides to off,
+	// making it look like "first keyboard shortcut press does nothing / turns off".
+	// Sync once here: keep builtins' switch in sync with persisted/display state.
 	setExtraDetail(extraDetail);
 
 	// Restore the CC theme if pi fell back to its built-in default at startup.
@@ -226,11 +229,14 @@ export function registerCommands(pi: ExtensionAPI): void {
     },
   });
 
-	// CC 没有 verbose 的键盘快捷键 —— claude-code-main 里 verbose 只能在 /config
-	// 面板切换（ctrl+shift+o 是 app:toggleTeammatePreview，与 verbose 无关）。
-	// 我们曾经把 extra detail 绑到 ctrl+shift+o 和 alt+o：单修饰键和弦在终端里
-	// 极易误触（macOS Option 即 ESC 前缀），而开关是持久化的、状态栏又无指示，
-	// 误触一次就默默刷几千行（2026-09-22 刷屏事故）。对齐 CC：只保留
-	// /cc-tools 命令切换；持久化保留（CC 也持久化 verbose 到 global config），
-	// 但开启时状态栏必须有指示（status-line.ts 的 detail 段）。
+	// CC has no keyboard shortcut for verbose — in claude-code-main verbose can only
+	// be toggled in the /config panel (ctrl+shift+o is app:toggleTeammatePreview,
+	// unrelated to verbose).
+	// We once bound extra detail to ctrl+shift+o and alt+o: single-modifier chords
+	// in the terminal are very easy to accidentally trigger (macOS Option is ESC
+	// prefix), and since the switch is persistent with no status bar indicator,
+	// an accidental press silently floods thousands of lines (2026-09-22 flood incident).
+	// Aligned with CC: keep only /cc-tools command toggle; persist the setting
+	// (CC also persists verbose to global config), but show an indicator in the
+	// status bar when enabled (detail section in status-line.ts).
 }

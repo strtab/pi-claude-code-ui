@@ -108,11 +108,13 @@ export function registerStatusLine(pi: ExtensionAPI): void {
 						}
 					}
 					if (cost > 0) parts.push(theme.fg("dim", `$${cost.toFixed(2)}`));
-					// extra detail (≈CC verbose)是持久化开关，误开后每屏可能刷上千行，
-					// 必须在状态栏可见——否则用户无从得知刷屏来源（2026-09-22 事故）。
-					// CC 状态栏本身没有 verbose 段（已核实 StatusLine.tsx），这段是超出 CC
-					// 的自有元素：只用 dim Mode 指示，不占 warning——warning 保留给上下文
-					// 将尽这类真正需要动作的状态，模式开启不是告警。
+					// extra detail (≈CC verbose) is a persistent toggle; when triggered accidentally
+					// it can flood thousands of lines per screen, so it must be visible in the
+					// status bar — otherwise users have no way to know the source of the flood
+					// (2026-09-22 incident).
+					// CC's own status bar has no verbose section (verified StatusLine.tsx); this
+					// is an element beyond CC: use dim mode indicator only, no warning — warning
+					// is reserved for critical states like near-exhaustion, not mode toggles.
 					if (isExtraDetail()) parts.push(theme.fg("dim", "detail"));
 					// Turn count appended when > 0 (session has received at least one user turn).
 					if (turns > 0) parts.push(theme.fg("dim", `${turns} ${turns === 1 ? "turn" : "turns"}`));

@@ -95,11 +95,12 @@ const MAX_DIFF_FILE_BYTES = 1_048_576; // 1 MiB
 // not accumulate one old-file copy per toolCallId forever (AUDIT §5:670).
 const MAX_WRITE_SNAPSHOTS = 64;
 
-// CC utils/terminal.ts:7 — MAX_LINES_TO_SHOW = 3（2026-09 核实 claude-code-main，
-// 旧快照的 8 行已改为 3 行视觉行）。折叠态预览预算按视觉行算，head-first。
+// CC utils/terminal.ts:7 — MAX_LINES_TO_SHOW = 3 (verified claude-code-main in
+// 2026-09; old snapshot of 8 lines changed to 3 visual rows). Preview budget
+// in collapsed state is counted in visual rows, head-first.
 const PREVIEW_LINES = 3;
-// extra detail ≈ CC 的 verbose：不截断（CC OutputLine shouldShowFull 走全文，
-// 仅受 pi 自身的 2000 行/50KB 工具层截断约束）。
+// extra detail ≈ CC verbose: no truncation (CC OutputLine shouldShowFull uses
+// full text, only constrained by pi's own 2000-line/50KB tool-layer truncation).
 const EXTRA_DETAIL_LINES = 12000;
 
 // CC ShellProgressMessage.tsx:44,83 — the streaming preview is a fixed 5-row
@@ -911,10 +912,11 @@ export function registerBuiltins(pi: ExtensionAPI): void {
 			// tailing is the point while output is still arriving. Only the completed
 			// view flips to head-first.
 			if (isPartial) {
-				// CC ShellProgressMessage.tsx:44 — verbose 时流式也走全文
-				// （strippedFullOutput），非 verbose 才是 5 行尾窗。extra detail 对齐
-				// 该行为（head-first 全文），但保留 MAX_RENDER_LINES 视觉行上限防
-				// minified 行炸屏。
+				// CC ShellProgressMessage.tsx:44 — in verbose mode streaming also uses full
+				// text (strippedFullOutput), non-verbose uses the 5-row tail window.
+				// extra detail aligns with this behavior (head-first full text), but keeps
+				// the MAX_RENDER_LINES visual row cap to prevent minified lines from
+				// flooding the screen.
 				const collected = extraDetail ? collectNonEmptyLines(output) : collectNonEmptyLines(output, STREAM_PREVIEW_ROWS);
 				setLiveLineCount(c, collected.total);
 				if (collected.total === 0) {

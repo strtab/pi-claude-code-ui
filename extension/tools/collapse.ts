@@ -373,8 +373,9 @@ export function collapsedSummary(
 	const parts: string[] = [];
 	// CC v2.1.234 — tense follows the group's ACTIVE window (present until the
 	// whole generation run settles, through thinking pauses between batches),
-	// not just whether a member is mid-flight (`running`). AUDIT §6 P2 "工具一
-	// 跑完就变过去时,CC 会一直保持进行时到整轮生成结束".
+	// not just whether a member is mid-flight (`running`). AUDIT §6 P2 "once a
+	// tool finishes it switches to past tense, but CC keeps present tense until
+	// the entire generation round ends".
 	const phase = group.active ? "active" : "settled";
 	const fragment = (kind: "search" | "read" | "list", count: number): void => {
 		const text =

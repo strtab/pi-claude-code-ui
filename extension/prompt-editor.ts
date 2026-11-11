@@ -1,6 +1,6 @@
 /**
- * CC prompt pointer — the `❯ ` at the head of the input box (AUDIT §6 启动
- * Logo/输入框 P1 "输入框缺少 CC 的 ❯ 提示符").
+ * CC prompt pointer — the `❯ ` at the head of the input box (AUDIT §6 startup
+ * Logo/input P1 "input box missing CC's ❯ prompt symbol").
  *
  * pi's editor renders `─` borders top/bottom with content lines between them
  * (pi-tui editor.js render). We extend pi's CustomEditor (NOT the bare pi-tui
