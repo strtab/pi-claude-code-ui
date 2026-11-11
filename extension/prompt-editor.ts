@@ -1,5 +1,5 @@
 /**
- * CC prompt pointer — the `❯ ` at the head of the input box (AUDIT §6 startup
+ * CC prompt pointer — the `> ` at the head of the input box (AUDIT §6 startup
  * Logo/input P1 "input box missing CC's ❯ prompt symbol").
  *
  * pi's editor renders `─` borders top/bottom with content lines between them
@@ -14,7 +14,7 @@ import type { ExtensionAPI, KeybindingsManager } from "@earendil-works/pi-coding
 import { CustomEditor } from "@earendil-works/pi-coding-agent";
 import type { EditorTheme, TUI } from "@earendil-works/pi-tui";
 
-/** Columns reserved for the pointer: `❯` + one space. */
+/** Columns reserved for the pointer: `>` + one space. */
 const PROMPT_COL = 2;
 
 export class PromptEditor extends CustomEditor {
@@ -36,7 +36,7 @@ export class PromptEditor extends CustomEditor {
 		// clamp padding below 2 — then skip painting rather than eat a column.
 		const first = rows[1];
 		if (first !== undefined && first.startsWith("  ")) {
-			rows[1] = `${this.borderColor("❯")} ${first.slice(2)}`;
+			rows[1] = `${this.borderColor(">")} ${first.slice(2)}`;
 		}
 		return rows;
 	}
