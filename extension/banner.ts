@@ -25,6 +25,12 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+/** Resolve the pi agent directory: $PI_CODING_AGENT_DIR if set, else `~/.pi/agent`. */
+function agentDir(): string {
+	const env = process.env.PI_CODING_AGENT_DIR;
+	return env && env.trim() !== "" ? env.trim() : join(homedir(), ".pi", "agent");
+}
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
@@ -129,7 +135,7 @@ function safeReaddir(dir: string): string[] {
 
 /** Discover skill names from user, agent, project, and package skill directories. */
 function discoverSkills(cwd: string): string[] {
-	const home = homedir();
+	const ad = agentDir();
 	const names = new Set<string>();
 	const collect = (dir: string): void => {
 		if (!existsSync(dir)) return;
@@ -139,11 +145,11 @@ function discoverSkills(cwd: string): string[] {
 	};
 	// User + agent + project skills (pi resource-loader scans agentDir/skills
 	// and <cwd>/.pi/skills).
-	collect(join(home, ".pi", "agent", "skills"));
-	collect(join(home, ".agents", "skills"));
+	collect(join(ad, "skills"));
+	collect(join(homedir(), ".agents", "skills"));
 	collect(join(cwd, ".pi", "skills"));
 	// Package skills: node_modules/<pkg>/skills/<skill>/ and @<scope>/<pkg>/skills/<skill>/
-	const nm = join(home, ".pi", "agent", "npm", "node_modules");
+	const nm = join(ad, "npm", "node_modules");
 	if (existsSync(nm)) {
 		for (const pkg of safeReaddir(nm)) {
 			if (pkg.startsWith(".")) continue;
@@ -195,7 +201,7 @@ function readSettingsArray(path: string, key: string): string[] {
  */
 function discoverExtensions(cwd: string): string[] {
 	const names = new Set<string>();
-	const dir = join(homedir(), ".pi", "agent", "extensions");
+	const dir = join(agentDir(), "extensions");
 	if (existsSync(dir)) {
 		for (const f of safeReaddir(dir)) {
 			if (f.endsWith(".ts") || f.endsWith(".js")) names.add(f.replace(/\.(ts|js)$/, ""));
@@ -602,7 +608,7 @@ const SEEN_PROJECTS_MAX = 50;
  * fs error degrades to condensed (never blocks startup).
  */
 function shouldShowFullBanner(cwd: string): boolean {
-	const stateDir = join(homedir(), ".pi", "agent");
+	const stateDir = agentDir();
 	const stateFile = join(stateDir, "cc-ui-banner.json");
 	let state: { version?: string; projects?: string[] } = {};
 	try {
