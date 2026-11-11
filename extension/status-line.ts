@@ -30,41 +30,40 @@ interface AssistantUsage {
 	usage: { cost: { total: number } };
 }
 
-function formatTokens(n: number): string {
-	if (n < 1000) return `${n}`;
-	return `${(n / 1000).toFixed(1)}k`;
-}
+/** Progress bar width (chars) — matches the bash reference script. */
+const BAR_WIDTH = 13;
+/** Characters for filled/empty segments. */
+const BAR_FILLED = "█";
+const BAR_EMPTY = "░";
 
-/** CC/old-ext duration format: <60s "Ns", <1h "Mm Ss", else "Hh Mm Ss". */
-function formatDuration(ms: number): string {
-	const totalSec = Math.floor(ms / 1000);
-	if (totalSec < 60) return `${totalSec}s`;
-	const hours = Math.floor(totalSec / 3600);
-	const mins = Math.floor((totalSec % 3600) / 60);
-	const secs = totalSec % 60;
-	if (hours < 1) return `${mins}m ${secs}s`;
-	return `${hours}h ${mins}m ${secs}s`;
+/** Render a context-usage progress bar, color-coded by pct. */
+function renderContextBar(pct: number, theme: import("@earendil-works/pi-coding-agent").Theme): string {
+	const filled = Math.round(pct * BAR_WIDTH / 100);
+	const empty = BAR_WIDTH - filled;
+	let bar = "";
+	// Pick color: success (< 70%), warning (70-90%), error (> 90%).
+	const color = pct >= 90 ? "error" : pct >= 70 ? "warning" : "success";
+	const colored = (s: string): string => theme.fg(color, s);
+	for (let i = 0; i < filled; i++) bar += BAR_FILLED;
+	for (let i = 0; i < empty; i++) bar += BAR_EMPTY;
+	return `${colored(bar)} ${pct}%`;
 }
 
 export function registerStatusLine(pi: ExtensionAPI): void {
+	function formatTokens(n: number): string {
+		if (n < 1000) return `${n}`;
+		return `${(n / 1000).toFixed(1)}k`;
+	}
+
 	pi.on("session_start", async (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
 
-		// Session totals: wall-clock and a user-turn counter. All three fields
-		// (cost / duration / turns) must share one baseline — CC seeds them
-		// together on resume (setCostStateForRestore adjusts startTime =
-		// Date.now() - lastDuration, cost-tracker.ts). Seeding cost from history
-		// but starting duration/turns from the resume moment makes the two halves
-		// of the same line contradict (AUDIT §5 status-line.ts:41). So on resume
-		// we seed turns from the user messages already in the branch and anchor
-		// the clock to the earliest entry's timestamp.
-		//
+		// Session cost and turns: seeded from branch history on resume.
 		// message_end with role "user" fires exactly once per submitted prompt
 		// (agent-loop.js:51-54/96-103) — not per LLM turn, so it isn't inflated
 		// by tools/retries/compaction.
 		let cost = 0;
 		let turns = 0;
-		let earliestMs = Date.now();
 		for (const e of ctx.sessionManager.getBranch()) {
 			if (e.type === "message" && e.message.role === "assistant") {
 				cost += (e.message as unknown as AssistantUsage).usage.cost.total;
@@ -72,13 +71,7 @@ export function registerStatusLine(pi: ExtensionAPI): void {
 			if (e.type === "message" && e.message.role === "user") {
 				turns += 1;
 			}
-			// SessionEntryBase.timestamp is an ISO string (session-manager.d.ts:21).
-			if (typeof e.timestamp === "string") {
-				const t = Date.parse(e.timestamp);
-				if (Number.isFinite(t) && t < earliestMs) earliestMs = t;
-			}
 		}
-		const sessionStartMs = earliestMs;
 
 		pi.on("message_end", async (event) => {
 			// Optional-chain the whole path: a failure-path assistant message may
@@ -103,29 +96,26 @@ export function registerStatusLine(pi: ExtensionAPI): void {
 					const window = ctx.model?.contextWindow ?? 0;
 					const tokens = usage?.tokens ?? 0;
 					const pct = window > 0 ? Math.round((tokens / window) * 100) : 0;
-					// CC's exceeds200kTokens: warn when the context is nearly exhausted.
-					const warn = window > 0 && tokens > window * 0.9;
 
 					const parts: string[] = [theme.fg("muted", model)];
 					parts.push(theme.fg("dim", cwd));
-					if (branch) parts.push(theme.fg("dim", `⎇ ${branch}`));
+					if (branch) parts.push(theme.fg("dim", branch));
 					if (tokens > 0) {
-						const ctxText = window > 0 ? `${pct}%` : formatTokens(tokens);
-						parts.push(warn ? theme.fg("warning", `ctx ${ctxText}`) : theme.fg("dim", `ctx ${ctxText}`));
+						if (window > 0) {
+							parts.push(renderContextBar(pct, theme));
+						} else {
+							parts.push(theme.fg("dim", formatTokens(tokens)));
+						}
 					}
 					if (cost > 0) parts.push(theme.fg("dim", `$${cost.toFixed(2)}`));
-					// Session totals (old ext: "Total time X · N turns"); hidden on a
-					// fresh session before the first turn completes.
-					if (turns > 0) {
-						const total = formatDuration(Date.now() - sessionStartMs);
-						parts.push(theme.fg("dim", `${total} · ${turns} ${turns === 1 ? "turn" : "turns"}`));
-					}
-					// extra detail（≈CC verbose）是持久化开关，误开后每屏可能刷上千行，
+					// extra detail (≈CC verbose)是持久化开关，误开后每屏可能刷上千行，
 					// 必须在状态栏可见——否则用户无从得知刷屏来源（2026-09-22 事故）。
 					// CC 状态栏本身没有 verbose 段（已核实 StatusLine.tsx），这段是超出 CC
 					// 的自有元素：只用 dim Mode 指示，不占 warning——warning 保留给上下文
 					// 将尽这类真正需要动作的状态，模式开启不是告警。
 					if (isExtraDetail()) parts.push(theme.fg("dim", "detail"));
+					// Turn count appended when > 0 (session has received at least one user turn).
+					if (turns > 0) parts.push(theme.fg("dim", `${turns} ${turns === 1 ? "turn" : "turns"}`));
 
 					const line = parts.join(theme.fg("dim", " · "));
 					return [truncateToWidth(line, width, "")];
