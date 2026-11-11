@@ -5,13 +5,13 @@ Claude Code visual identity for [pi](https://pi.dev): themes, welcome banner, st
 ## Install
 
 ```bash
-pi install npm:better-claude-code-ui
+pi install git:github.com/strtab/pi-claude-code-ui
 ```
 
 Try it without installing:
 
 ```bash
-pi -e npm:better-claude-code-ui
+pi -e git:github.com/strtab/pi-claude-code-ui
 ```
 
 ### Recommended setting
