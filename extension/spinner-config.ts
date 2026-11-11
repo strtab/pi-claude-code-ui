@@ -52,7 +52,6 @@ export const PRESETS: Record<string, SpinnerConfig> = {
 	dots: { frames: ["⠁", "⠂", "⠄", "⡀", "⢀", "⠠", "⠐", "⠈"], pingPong: false, frameMs: 100, glimmer: true },
 	line: { frames: ["-", "\\", "|", "/"], pingPong: false, frameMs: 120, glimmer: true },
 	arrows: { frames: ["←", "↖", "↑", "↗", "→", "↘", "↓", "↙"], pingPong: false, frameMs: 100, glimmer: true },
-	minimal: { frames: ["·", "•", "●", "•"], pingPong: false, frameMs: 150, glimmer: false },
 };
 
 // ---------------------------------------------------------------------------
