@@ -344,7 +344,16 @@ export function registerSpinner(pi: ExtensionAPI): void {
 		}
 	}
 
-	function paintFor(theme: Theme): SpinnerPaint {
+  function paintFor(theme: Theme): SpinnerPaint {
+    // CC messageColor 'claude' / shimmerColor 'claudeShimmer' are BRAND
+    // colors, not the UI accent: resolve the CC palette directly.
+    const pal = resolvePalette(theme.name, (token) => {
+      try {
+        return theme.fg(token as never, "x");
+      } catch {
+        return undefined;
+      }
+    });
     const cfg = getSpinnerConfig();
     const accent = hexPainter(cfg.accent);
     const shimmer = hexPainter(cfg.shimmer);
@@ -353,7 +362,7 @@ export function registerSpinner(pi: ExtensionAPI): void {
       shimmer: shimmer ?? accent ?? ((s) => paletteFg(pal.cc.claudeShimmer, s)),
       dim: (s) => theme.fg("dim", s),
     };
-	}
+  }
 
 	type UiCtx = { hasUI: boolean; ui: { theme: Theme; setWorkingMessage(m?: string): void } };
 
